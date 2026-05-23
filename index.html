@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="AOW"/>
+  <meta name="theme-color" content="#C9A84C"/>
+  <meta name="description" content="Art of War Crypto Intelligence — Remittance war strategy, live prices, phase rotation signals"/>
+
+  <title>AOW · Art of War</title>
+  <link rel="manifest" href="/manifest.json"/>
+
+  <!-- Apple touch icons (Safari home screen) -->
+  <link rel="apple-touch-icon" href="icon-192.png"/>
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; background: #080A0E; }
+    body { font-family: 'Courier New', monospace; color: #E8E8E8; overscroll-behavior: none; }
+    /* Safe area padding for notched phones */
+    #root { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #0D1117; }
+    ::-webkit-scrollbar-thumb { background: #C9A84C44; border-radius: 2px; }
+    /* Prevent text selection on tap */
+    button { -webkit-tap-highlight-color: transparent; user-select: none; }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:16px;">
+      <div style="font-size:32px;font-weight:900;color:#C9A84C;letter-spacing:6px;">AOW</div>
+      <div style="font-size:10px;color:#6B7280;letter-spacing:3px;">LOADING INTELLIGENCE…</div>
+      <div style="width:120px;height:2px;background:#1C2333;margin-top:8px;">
+        <div id="load-bar" style="width:0%;height:100%;background:#C9A84C;transition:width 0.3s ease;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- React + Babel via CDN — no build step needed -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script>
+    // Animate loading bar while Babel loads
+    let w = 0;
+    const bar = document.getElementById('load-bar');
+    const iv = setInterval(() => { w = Math.min(w + Math.random() * 15, 90); if(bar) bar.style.width = w + '%'; }, 200);
+  </script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    // ── Colours ──────────────────────────────────────────────────────────────
+    const C = {
+      bg:"#080A0E", surface:"#0D1117", border:"#1C2333",
+      gold:"#C9A84C", goldDim:"#8A6F2E",
+      red:"#FF3B3B", green:"#00FF88", greenDim:"#00CC6A",
+      blue:"#4A9EFF", purple:"#A855F7",
+      text:"#E8E8E8", muted:"#6B7280",
+    };
+
+    // ── Data ─────────────────────────────────────────────────────────────────
+    const COINGECKO_IDS = {
+      XRP:"ripple", SOL:"solana", ETH:"ethereum", LINK:"chainlink",
+      ADA:"cardano", HBAR:"hedera-hashgraph", IP:"story-protocol",
+      RNDR:"render-token", ATOM:"cosmos", XLM:"stellar",
+      AVAX:"avalanche-2", OCEAN:"ocean-protocol", POL:"matic-network",
+      DOT:"polkadot", DESO:"decentralized-social", ICP:"internet-computer",
+    };
+
+    const PORTFOLIO_BASE = [
+      { symbol:"XRP",  name:"Ripple",            amount:3012.39, role:"remittance",    phase:1 },
+      { symbol:"SOL",  name:"Solana",            amount:18.16,   role:"remittance",    phase:1, staked:true },
+      { symbol:"ETH",  name:"Ethereum",          amount:0.3449,  role:"foundation",    phase:2, staked:true },
+      { symbol:"LINK", name:"Chainlink",         amount:61.79,   role:"oracle",        phase:1 },
+      { symbol:"ADA",  name:"Cardano",           amount:1800.87, role:"infrastructure",phase:2, staked:true },
+      { symbol:"HBAR", name:"Hedera",            amount:3458.14, role:"enterprise",    phase:1 },
+      { symbol:"IP",   name:"Story",             amount:500,     role:"speculative",   phase:3 },
+      { symbol:"RNDR", name:"Render",            amount:102.36,  role:"ai",            phase:3 },
+      { symbol:"ATOM", name:"Cosmos",            amount:95.87,   role:"infrastructure",phase:2, staked:true },
+      { symbol:"XLM",  name:"Stellar",           amount:810.78,  role:"remittance",    phase:1 },
+      { symbol:"AVAX", name:"Avalanche",         amount:11.24,   role:"infrastructure",phase:2, staked:true },
+      { symbol:"OCEAN",name:"Ocean Protocol",    amount:884.41,  role:"ai",            phase:3 },
+      { symbol:"POL",  name:"Polygon",           amount:1050.14, role:"scaling",       phase:2, staked:true },
+      { symbol:"DOT",  name:"Polkadot",          amount:39.07,   role:"infrastructure",phase:2, staked:true },
+      { symbol:"DESO", name:"DeSo",              amount:12.72,   role:"speculative",   phase:3 },
+      { symbol:"ICP",  name:"Internet Computer", amount:7.69,    role:"speculative",   phase:3 },
+    ];
+
+    const REMITTANCE_WAR = [
+      { company:"Ripple",        token:"XRP", stablecoin:"RLUSD", chain:"XRP Ledger", partner:"BNY Mellon",        strength:88 },
+      { company:"Western Union", token:"SOL", stablecoin:"USDPT", chain:"Solana",     partner:"Anchorage Digital",  strength:74 },
+      { company:"MoneyGram",     token:"XLM", stablecoin:"USDC",  chain:"Stellar",    partner:"Circle",             strength:61 },
+    ];
+
+    const INTEL_FEED = [
+      { date:"May 21, 2026", event:"CNBC Disruptor 50 — Anthropic #1, AI dominates",       impact:"neutral", phase:2 },
+      { date:"May 4, 2026",  event:"Western Union USDPT goes live on Solana",              impact:"bullish", phase:1 },
+      { date:"Apr 27, 2026", event:"WU CEO: 'No longer if — it's how fast we scale'",      impact:"bullish", phase:1 },
+      { date:"Dec 2025",     event:"OCC approves Ripple National Trust Bank",              impact:"bullish", phase:1 },
+      { date:"Nov 2025",     event:"Ripple raises $500M at $40B valuation from Citadel",  impact:"bullish", phase:1 },
+      { date:"Oct 2025",     event:"Western Union announces USDPT + Solana partnership",  impact:"bullish", phase:1 },
+      { date:"Jul 2025",     event:"Dubai Land Dept tokenizes real estate on XRP Ledger", impact:"bullish", phase:1 },
+    ];
+
+    const BTC_INFLOW_THRESHOLD = 5950;
+    const BTC_INFLOW_CURRENT   = 3240;
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    const fmt = (n, d=2) => n==null?"—":n.toLocaleString("en-US",{minimumFractionDigits:d,maximumFractionDigits:d});
+    const fngColor = v => v<=25?"#FF3B3B":v<=45?"#FF8C42":v<=55?"#C9A84C":v<=75?"#6FCF97":"#00FF88";
+    const fngLabel = v => v<=25?"EXTREME FEAR":v<=45?"FEAR":v<=55?"NEUTRAL":v<=75?"GREED":"EXTREME GREED";
+
+    function PhaseBadge({ phase, size="sm" }) {
+      const cols={1:C.gold,2:C.blue,3:C.green};
+      const lbls={1:"I",2:"II",3:"III"};
+      return <span style={{fontSize:size==="sm"?8:10,fontFamily:"monospace",fontWeight:700,
+        color:cols[phase],border:`1px solid ${cols[phase]}`,padding:"1px 4px",letterSpacing:1,whiteSpace:"nowrap"}}>P{lbls[phase]}</span>;
+    }
+
+    function GlowBar({ value, max, color, height=5 }) {
+      const pct=Math.min((value/max)*100,100);
+      return (
+        <div style={{background:"#1C2333",height,width:"100%",flexShrink:0}}>
+          <div style={{width:`${pct}%`,height:"100%",background:color,boxShadow:`0 0 6px ${color}`,transition:"width 1.2s ease"}}/>
+        </div>
+      );
+    }
+
+    function Change({ val }) {
+      if (val==null) return <span style={{color:C.muted,fontSize:10}}>—</span>;
+      const up=val>=0;
+      return <span style={{color:up?C.green:C.red,fontSize:10,fontFamily:"monospace",whiteSpace:"nowrap"}}>
+        {up?"▲":"▼"}{Math.abs(val).toFixed(2)}%
+      </span>;
+    }
+
+    // ── Ticker ────────────────────────────────────────────────────────────────
+    function Ticker({ prices, market }) {
+      const ref=useRef(null), animRef=useRef(null), pos=useRef(0);
+      useEffect(()=>{
+        const el=ref.current; if(!el) return;
+        const step=()=>{ pos.current-=0.5; if(Math.abs(pos.current)>=el.scrollWidth/2) pos.current=0; el.style.transform=`translateX(${pos.current}px)`; animRef.current=requestAnimationFrame(step); };
+        animRef.current=requestAnimationFrame(step);
+        return()=>cancelAnimationFrame(animRef.current);
+      },[]);
+
+      const items=[
+        ...["XRP","SOL","XLM"].map(s=>{const p=prices[s]; return p?`${s} $${fmt(p.price,s==="XLM"?4:2)} ${p.change24h>=0?"▲":"▼"}${Math.abs(p.change24h).toFixed(1)}%`:`${s} …`;}),
+        market.fng?`F&G ${market.fng.value} ${fngLabel(market.fng.value)}`:"F&G …",
+        market.btcDom?`BTC DOM ${market.btcDom.toFixed(1)}%`:"BTC DOM …",
+        market.btcPrice?`BTC $${fmt(market.btcPrice)}`:"BTC …",
+        "WU USDPT LIVE ON SOLANA",
+        "PHASE I ACTIVE",
+        "RLUSD $1B+ MARKET CAP",
+        `ETF INFLOWS $${(BTC_INFLOW_CURRENT/1000).toFixed(2)}B/WK`,
+      ];
+      const doubled=[...items,...items];
+      return (
+        <div style={{overflow:"hidden",borderBottom:`1px solid ${C.border}`,padding:"5px 0",background:"#0A0C10",flexShrink:0}}>
+          <div ref={ref} style={{display:"flex",whiteSpace:"nowrap",willChange:"transform"}}>
+            {doubled.map((item,i)=><span key={i} style={{fontFamily:"monospace",fontSize:10,color:C.gold,marginRight:36}}>◆ {item}</span>)}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Market Pulse ──────────────────────────────────────────────────────────
+    function MarketPulse({ market, prices }) {
+      const fng=market.fng; const btcDom=market.btcDom; const mcap=market.mcap; const btcP=market.btcPrice;
+      const btcChange=prices.BTC?.change24h||0;
+      const beating=PORTFOLIO_BASE.filter(a=>prices[a.symbol]&&prices[a.symbol].change24h>btcChange).length;
+      const altSeason=Math.round((beating/PORTFOLIO_BASE.length)*100);
+
+      const stats=[
+        {label:"FEAR & GREED", value:fng?fng.value:"…", sub:fng?fngLabel(fng.value):"loading", color:fng?fngColor(fng.value):C.muted, bar:fng?{v:fng.value,m:100,c:fngColor(fng.value)}:null},
+        {label:"BTC DOMINANCE", value:btcDom?`${btcDom.toFixed(1)}%`:"…", sub:btcDom?(btcDom>58?"BTC dominant":"Alt season"):"loading", color:btcDom?(btcDom>58?C.gold:C.green):C.muted, bar:btcDom?{v:btcDom,m:100,c:btcDom>58?C.gold:C.green}:null},
+        {label:"TOTAL MCAP", value:mcap?`$${(mcap/1e12).toFixed(2)}T`:"…", sub:"Global crypto", color:C.blue, bar:null},
+        {label:"BTC PRICE", value:btcP?`$${fmt(btcP)}`:"…", sub:prices.BTC?<Change val={prices.BTC.change24h}/>:"Phase III target", color:C.gold, bar:null},
+        {label:"ALT SEASON", value:`${altSeason}%`, sub:altSeason>=75?"🔥 Your thesis works":"Mixed vs BTC", color:altSeason>=75?C.green:C.gold, bar:{v:altSeason,m:100,c:altSeason>=75?C.green:C.gold}},
+        {label:"ETF SIGNAL", value:`${Math.round((BTC_INFLOW_CURRENT/BTC_INFLOW_THRESHOLD)*100)}%`, sub:"Of rotation trigger", color:C.gold, bar:{v:BTC_INFLOW_CURRENT,m:BTC_INFLOW_THRESHOLD,c:C.gold}},
+      ];
+
+      return (
+        <div style={{background:C.surface,border:`1px solid ${C.border}`,padding:14,borderRadius:4}}>
+          <div style={{fontFamily:"monospace",fontSize:9,color:C.muted,letterSpacing:2,marginBottom:12}}>LIVE MARKET INTELLIGENCE</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
+            {stats.map((s,i)=>(
+              <div key={i} style={{padding:10,background:"#0A0C10",border:`1px solid ${C.border}`,borderRadius:3}}>
+                <div style={{fontFamily:"monospace",fontSize:7,color:C.muted,letterSpacing:1,marginBottom:4}}>{s.label}</div>
+                <div style={{fontFamily:"monospace",fontSize:16,color:s.color,fontWeight:700,marginBottom:2}}>{s.value}</div>
+                <div style={{fontFamily:"monospace",fontSize:8,color:C.muted,marginBottom:s.bar?6:0}}>{s.sub}</div>
+                {s.bar&&<GlowBar value={s.bar.v} max={s.bar.m} color={s.bar.c} height={3}/>}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Command Tab ───────────────────────────────────────────────────────────
+    function CommandTab({ prices, market }) {
+      const withP=PORTFOLIO_BASE.map(a=>({...a,value:prices[a.symbol]?prices[a.symbol].price*a.amount:0}));
+      const remTotal=withP.filter(a=>a.role==="remittance").reduce((s,a)=>s+a.value,0);
+      const stakedTotal=withP.filter(a=>a.staked).reduce((s,a)=>s+a.value,0);
+      const pct=Math.round((BTC_INFLOW_CURRENT/BTC_INFLOW_THRESHOLD)*100);
+
+      return (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{padding:"10px 14px",background:`${C.gold}10`,border:`1px solid ${C.goldDim}`,borderLeft:`3px solid ${C.gold}`,borderRadius:4}}>
+            <div style={{fontSize:10,color:C.gold,fontStyle:"italic",lineHeight:1.5}}>"Supreme excellence: breaking the enemy's resistance without fighting."</div>
+            <div style={{fontSize:8,color:C.muted,marginTop:4}}>— Sun Tzu · Let remittance infrastructure win before retail knows the war began.</div>
+          </div>
+
+          <MarketPulse market={market} prices={prices}/>
+
+          {/* Phase status */}
+          <div style={{background:C.surface,border:`1px solid ${C.border}`,padding:14,borderRadius:4}}>
+            <div style={{fontFamily:"monospace",fontSize:9,color:C.muted,letterSpacing:2,marginBottom:10}}>WAR PHASE STATUS</div>
+            <div style={{display:"flex",gap:2,marginBottom:12}}>
+              {[{n:1,l:"ACCUMULATE",c:C.gold},{n:2,l:"WATCH",c:C.blue},{n:3,l:"ROTATE",c:C.green}].map(p=>(
+                <div key={p.n} style={{flex:1,padding:"8px 6px",background:p.n===1?`${p.c}18`:"transparent",border:`1px solid ${p.n===1?p.c:C.border}`,borderRadius:3}}>
+                  <div style={{fontFamily:"monospace",fontSize:7,color:p.c,letterSpacing:1,marginBottom:2}}>PHASE {p.n}</div>
+                  <div style={{fontFamily:"monospace",fontSize:9,color:p.n===1?p.c:C.muted,fontWeight:700}}>{p.l}</div>
+                </div>
+              ))}
+            </div>
+            <GlowBar value={BTC_INFLOW_CURRENT} max={BTC_INFLOW_THRESHOLD} color={C.gold}/>
+            <div style={{display:"flex",justifyContent:"space-between",marginTop:4,marginBottom:10}}>
+              <span style={{fontFamily:"monospace",fontSize:8,color:C.muted}}>${(BTC_INFLOW_CURRENT/1000).toFixed(2)}B/wk</span>
+              <span style={{fontFamily:"monospace",fontSize:8,color:C.gold}}>{pct}% of ${(BTC_INFLOW_THRESHOLD/1000).toFixed(2)}B trigger</span>
+            </div>
+            <div style={{padding:"6px 10px",background:"#0D1F0D",border:`1px solid ${C.greenDim}`,display:"flex",alignItems:"center",gap:6,borderRadius:3}}>
+              <div style={{width:6,height:6,background:C.green,borderRadius:"50%",boxShadow:`0 0 5px ${C.green}`,flexShrink:0}}/>
+              <span style={{fontFamily:"monospace",fontSize:8,color:C.green}}>HOLD PHASE I — ROTATION NOT TRIGGERED</span>
+            </div>
+          </div>
+
+          {/* Two stat cards */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            <div style={{background:C.surface,border:`1px solid ${C.border}`,padding:12,borderRadius:4}}>
+              <div style={{fontFamily:"monospace",fontSize:8,color:C.muted,letterSpacing:1,marginBottom:10}}>REMITTANCE WAR</div>
+              {PORTFOLIO_BASE.filter(a=>a.role==="remittance").map((a,i)=>{
+                const p=prices[a.symbol];
+                return <div key={i} style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontFamily:"monospace",fontSize:10,color:C.gold}}>{a.symbol}</span>
+                  <div style={{textAlign:"right"}}>
+                    {p&&<div style={{fontSize:8}}><Change val={p.change24h}/></div>}
+                    <div style={{fontFamily:"monospace",fontSize:10,color:C.text}}>${fmt(p?p.price*a.amount:0)}</div>
+                  </div>
+                </div>;
+              })}
+              <div style={{borderTop:`1px solid ${C.border}`,paddingTop:6,marginTop:4,display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontFamily:"monospace",fontSize:9,color:C.muted}}>TOTAL</span>
+                <span style={{fontFamily:"monospace",fontSize:12,color:C.gold,fontWeight:700}}>${fmt(remTotal)}</span>
+              </div>
+            </div>
+            <div style={{background:C.surface,border:`1px solid ${C.border}`,padding:12,borderRadius:4}}>
+              <div style={{fontFamily:"monospace",fontSize:8,color:C.muted,letterSpacing:1,marginBottom:10}}>STAKING YIELD ⚡</div>
+              {PORTFOLIO_BASE.filter(a=>a.staked).map((a,i)=>{
+                const val=prices[a.symbol]?prices[a.symbol].price*a.amount:0;
+                return <div key={i} style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                  <span style={{fontFamily:"monospace",fontSize:10,color:C.green}}>⚡{a.symbol}</span>
+                  <span style={{fontFamily:"monospace",fontSize:10,color:C.text}}>${fmt(val)}</span>
+                </div>;
+              })}
+              <div style={{borderTop:`1px solid ${C.border}`,paddingTop:6,marginTop:4,display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontFamily:"monospace",fontSize:9,color:C.muted}}>TOTAL</span>
+                <span style={{fontFamily:"monospace",fontSize:12,color:C.green,fontWeight:700}}>${fmt(stakedTotal)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ── Portfolio Tab ─────────────────────────────────────────────────────────
+    function PortfolioTab({ prices }) {
+      const [filter,setFilter]=useState("all");
+      const roleColor=r=>r==="remittance"?C.gold:r==="oracle"?C.blue:r==="ai"?C.purple:C.muted;
+      const withP=PORTFOLIO_BASE.map(a=>{const p=prices[a.symbol];return{...a,price:p?.price||0,change24h:p?.change24h||null,value:p?p.price*a.amount:0};}).sort((a,b)=>b.value-a.value);
+      const total=withP.reduce((s,a)=>s+a.value,0);
+      const filters=["all","remittance","staked","speculative"];
+      const filtered=filter==="all"?withP:filter==="remittance"?withP.filter(a=>a.role==="remittance"):filter==="staked"?withP.filter(a=>a.staked):withP.filter(a=>a.role==="speculative");
+
+      return (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {[
+              {l:"TOTAL VALUE",v:`$${fmt(total)}`,c:C.gold},
+              {l:"REMITTANCE %",v:`${total>0?Math.round((withP.filter(a=>a.role==="remittance").reduce((s,a)=>s+a.value,0)/total)*100):0}%`,c:C.gold},
+            ].map((s,i)=>(
+              <div key={i} style={{padding:10,background:C.surface,border:`1px solid ${C.border}`,borderRadius:4}}>
+                <div style={{fontFamily:"monospace",fontSize:8,color:C.muted,marginBottom:4}}>{s.l}</div>
+                <div style={{fontFamily:"monospace",fontSize:16,color:s.c,fontWeight:700}}>{s.v}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{display:"flex",gap:4}}>
+            {filters.map(f=>(
+              <button key={f} onClick={()=>setFilter(f)} style={{flex:1,fontFamily:"monospace",fontSize:8,padding:"5px 2px",
+                background:filter===f?C.gold:"transparent",color:filter===f?C.bg:C.muted,
+                border:`1px solid ${filter===f?C.gold:C.border}`,cursor:"pointer",letterSpacing:0.5,textTransform:"uppercase",borderRadius:2}}>
+                {f}
+              </button>
+            ))}
+          </div>
+
+          <div style={{display:"flex",flexDirection:"column",gap:3}}>
+            {filtered.map((a,i)=>(
+              <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:C.surface,border:`1px solid ${C.border}`,borderRadius:3}}>
+                <span style={{fontFamily:"monospace",fontSize:11,color:roleColor(a.role),fontWeight:700,width:40,flexShrink:0}}>{a.symbol}</span>
+                <div style={{flex:1}}>
+                  <GlowBar value={a.value} max={withP[0]?.value||1} color={roleColor(a.role)}/>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontFamily:"monospace",fontSize:10,color:C.text}}>${fmt(a.value)}</div>
+                  <Change val={a.change24h}/>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"flex-end",flexShrink:0}}>
+                  <PhaseBadge phase={a.phase}/>
+                  {a.staked&&<span style={{fontSize:8,color:C.green}}>⚡</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ── War Tab ───────────────────────────────────────────────────────────────
+    function WarTab({ prices }) {
+      return (
+        <div style={{background:C.surface,border:`1px solid ${C.border}`,padding:16,borderRadius:4}}>
+          <div style={{fontFamily:"monospace",fontSize:9,color:C.muted,letterSpacing:2,marginBottom:16}}>REMITTANCE WAR SCOREBOARD</div>
+          {REMITTANCE_WAR.map((r,i)=>{
+            const p=prices[r.token];
+            const cols=[C.gold,C.blue,C.muted];
+            return (
+              <div key={i} style={{marginBottom:i<2?16:0,paddingBottom:i<2?16:0,borderBottom:i<2?`1px solid ${C.border}`:"none"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                  <div>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                      <span style={{fontFamily:"monospace",fontSize:13,color:C.text,fontWeight:700}}>{r.company}</span>
+                      <span style={{fontFamily:"monospace",fontSize:8,color:C.green,border:`1px solid ${C.greenDim}`,padding:"1px 4px"}}>LIVE</span>
+                    </div>
+                    <div style={{fontFamily:"monospace",fontSize:9,color:C.muted,marginBottom:4}}>
+                      {r.token} → {r.stablecoin} on {r.chain} · Anchor: {r.partner}
+                    </div>
+                    {p&&<div style={{display:"flex",gap:10,alignItems:"center"}}>
+                      <span style={{fontFamily:"monospace",fontSize:12,color:cols[i]}}>${fmt(p.price,r.token==="XLM"?4:2)}</span>
+                      <Change val={p.change24h}/>
+                    </div>}
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:0}}>
+                    <div style={{fontFamily:"monospace",fontSize:24,color:cols[i],fontWeight:700}}>{r.strength}</div>
+                    <div style={{fontFamily:"monospace",fontSize:8,color:C.muted}}>WAR SCORE</div>
+                  </div>
+                </div>
+                <GlowBar value={r.strength} max={100} color={cols[i]}/>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // ── Strategy Tab ──────────────────────────────────────────────────────────
+    function StrategyTab({ market }) {
+      const fng=market.fng?.value; const btcDom=market.btcDom;
+      const rotPct=Math.round((BTC_INFLOW_CURRENT/BTC_INFLOW_THRESHOLD)*100);
+      const signals=[
+        {l:"Fear & Greed",    v:fng?`${fng} — ${fngLabel(fng)}`:"loading", hold:fng&&fng<70, c:fng?fngColor(fng):C.muted},
+        {l:"BTC Dominance",   v:btcDom?`${btcDom.toFixed(1)}%`:"loading",  hold:!btcDom||btcDom<65, c:btcDom?(btcDom<58?C.green:C.gold):C.muted},
+        {l:"ETF Inflow Meter",v:`${rotPct}% of trigger`,                   hold:rotPct<80, c:rotPct>=80?C.green:C.gold},
+      ];
+      const steps=[
+        {phase:1,title:"ACCUMULATE",action:"Hold XRP/SOL/XLM. Stake everything. Collect yield. Let remittance catalysts drive price.",signal:"CBDC deals, custody partnerships, corridor launches"},
+        {phase:2,title:"WATCH",     action:"Monitor BTC ETF inflows weekly. Approach $5.95B = prepare rotation. Don't sell yet.",      signal:"Bloomberg, CoinShares weekly ETF flow reports"},
+        {phase:3,title:"ROTATE",    desc:"Take altcoin gains → BTC. BTC becomes your vault. Altcoins were your income engine.",         signal:"ETF threshold breached + retail FOMO headlines"},
+      ];
+      return (
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          <div style={{background:C.surface,border:`1px solid ${C.border}`,padding:14,borderRadius:4}}>
+            <div style={{fontFamily:"monospace",fontSize:9,color:C.muted,letterSpacing:2,marginBottom:10}}>LIVE ROTATION SIGNALS</div>
+            {signals.map((s,i)=>(
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:"#0A0C10",border:`1px solid ${s.hold?C.greenDim:C.goldDim}`,borderRadius:3,marginBottom:6}}>
+                <span style={{fontFamily:"monospace",fontSize:9,color:C.muted}}>{s.l}</span>
+                <span style={{fontFamily:"monospace",fontSize:10,color:s.c,fontWeight:700}}>{s.v}</span>
+                <span style={{fontFamily:"monospace",fontSize:8,color:s.hold?C.green:C.gold,fontWeight:700}}>{s.hold?"HOLD":"WATCH"}</span>
+              </div>
+            ))}
+            <div style={{padding:"6px 10px",background:"#0D1F0D",border:`1px solid ${C.greenDim}`,fontFamily:"monospace",fontSize:8,color:C.green,borderRadius:3}}>
+              ✓ ALL SIGNALS: STAY PHASE I — ROTATION CONDITIONS NOT MET
+            </div>
+          </div>
+          <div style={{background:C.surface,border:`1px solid ${C.border}`,padding:14,borderRadius:4}}>
+            <div style={{fontFamily:"monospace",fontSize:9,color:C.muted,letterSpacing:2,marginBottom:10}}>AOW PLAYBOOK</div>
+            {steps.map((s,i)=>(
+              <div key={i} style={{marginBottom:i<2?10:0,padding:10,background:"#0A0C10",border:`1px solid ${s.phase===1?C.gold:C.border}`,borderRadius:3}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                  <PhaseBadge phase={s.phase} size="md"/>
+                  <span style={{fontFamily:"monospace",fontSize:11,color:s.phase===1?C.gold:C.muted,fontWeight:700}}>{s.title}</span>
+                  {s.phase===1&&<span style={{fontFamily:"monospace",fontSize:8,color:C.green}}>← NOW</span>}
+                </div>
+                <div style={{fontFamily:"monospace",fontSize:9,color:C.text,lineHeight:1.5,marginBottom:4}}>{s.action||s.desc}</div>
+                <div style={{fontFamily:"monospace",fontSize:8,color:C.muted}}>SIGNAL: {s.signal}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ── Intel Tab ─────────────────────────────────────────────────────────────
+    function IntelTab() {
+      return (
+        <div style={{background:C.surface,border:`1px solid ${C.border}`,padding:14,borderRadius:4}}>
+          <div style={{fontFamily:"monospace",fontSize:9,color:C.muted,letterSpacing:2,marginBottom:12}}>INTELLIGENCE FEED</div>
+          {INTEL_FEED.map((item,i)=>(
+            <div key={i} style={{display:"flex",gap:10,padding:"8px 10px",background:"#0A0C10",borderLeft:`2px solid ${item.impact==="bullish"?C.green:C.muted}`,borderRadius:2,marginBottom:5}}>
+              <div style={{fontFamily:"monospace",fontSize:8,color:C.muted,whiteSpace:"nowrap",minWidth:60}}>{item.date}</div>
+              <div style={{fontFamily:"monospace",fontSize:9,color:C.text,flex:1,lineHeight:1.4}}>{item.event}</div>
+              <PhaseBadge phase={item.phase}/>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // ── Main App ──────────────────────────────────────────────────────────────
+    function App() {
+      const [tab,setTab]           = useState("command");
+      const [time,setTime]         = useState(new Date());
+      const [prices,setPrices]     = useState({});
+      const [market,setMarket]     = useState({});
+      const [lastUpd,setLastUpd]   = useState(null);
+      const [errs,setErrs]         = useState([]);
+
+      useEffect(()=>{ const id=setInterval(()=>setTime(new Date()),1000); return()=>clearInterval(id); },[]);
+
+      const fetchPrices=useCallback(async()=>{
+        try {
+          const ids=[...Object.values(COINGECKO_IDS),"bitcoin"].join(",");
+          const res=await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`);
+          if(!res.ok) throw new Error(`HTTP ${res.status}`);
+          const data=await res.json();
+          const m={};
+          for(const [s,id] of Object.entries(COINGECKO_IDS)) if(data[id]) m[s]={price:data[id].usd,change24h:data[id].usd_24h_change};
+          if(data.bitcoin) m.BTC={price:data.bitcoin.usd,change24h:data.bitcoin.usd_24h_change};
+          setPrices(m); setErrs(e=>e.filter(x=>!x.startsWith("Price")));
+        } catch(e){ setErrs(p=>[...p.filter(x=>!x.startsWith("Price")),`Price feed: ${e.message}`]); }
+      },[]);
+
+      const fetchGlobal=useCallback(async()=>{
+        try {
+          const res=await fetch("https://api.coingecko.com/api/v3/global");
+          if(!res.ok) throw new Error(`HTTP ${res.status}`);
+          const {data}=await res.json();
+          setMarket(m=>({...m,btcDom:data.market_cap_percentage?.btc,mcap:data.total_market_cap?.usd}));
+          setErrs(e=>e.filter(x=>!x.startsWith("Global")));
+        } catch(e){ setErrs(p=>[...p.filter(x=>!x.startsWith("Global")),`Global: ${e.message}`]); }
+      },[]);
+
+      const fetchFng=useCallback(async()=>{
+        try {
+          const res=await fetch("https://api.alternative.me/fng/?limit=1&format=json");
+          if(!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json=await res.json();
+          const d=json.data?.[0];
+          if(d) setMarket(m=>({...m,fng:{value:parseInt(d.value),label:d.value_classification}}));
+          setErrs(e=>e.filter(x=>!x.startsWith("F&G")));
+        } catch(e){ setErrs(p=>[...p.filter(x=>!x.startsWith("F&G")),`F&G: ${e.message}`]); }
+      },[]);
+
+      const fetchAll=useCallback(async()=>{ await Promise.all([fetchPrices(),fetchGlobal(),fetchFng()]); setLastUpd(new Date()); },[fetchPrices,fetchGlobal,fetchFng]);
+
+      useEffect(()=>{ fetchAll(); const id=setInterval(fetchAll,60000); return()=>clearInterval(id); },[fetchAll]);
+
+      const fullMarket={...market,btcPrice:prices.BTC?.price};
+      const total=PORTFOLIO_BASE.reduce((s,a)=>s+(prices[a.symbol]?prices[a.symbol].price*a.amount:0),0);
+      const tabs=[{id:"command",icon:"⚔"},{id:"portfolio",icon:"◈"},{id:"war",icon:"⚡"},{id:"strategy",icon:"◎"},{id:"intel",icon:"◉"},{id:"legal",icon:"⚖"}];
+
+      return (
+        <div style={{display:"flex",flexDirection:"column",height:"100%",background:C.bg,maxWidth:480,margin:"0 auto"}}>
+          {/* Header */}
+          <div style={{background:"#0A0C10",borderBottom:`1px solid ${C.border}`,padding:"10px 16px",flexShrink:0}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div>
+                  <div style={{fontSize:20,fontWeight:900,color:C.gold,letterSpacing:4,lineHeight:1}}>AOW</div>
+                  <div style={{fontSize:7,color:C.muted,letterSpacing:2}}>ART OF WAR · CRYPTO INTELLIGENCE</div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:4}}>
+                  <div style={{width:6,height:6,background:C.green,borderRadius:"50%",boxShadow:`0 0 6px ${C.green}`}}/>
+                  <span style={{fontSize:8,color:C.green,letterSpacing:1}}>PHASE I</span>
+                </div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                {total>0&&<div style={{fontFamily:"monospace",fontSize:13,color:C.gold,fontWeight:700}}>${fmt(total)}</div>}
+                <div style={{fontFamily:"monospace",fontSize:9,color:C.muted}}>{time.toLocaleTimeString()}</div>
+                {lastUpd&&<div style={{fontFamily:"monospace",fontSize:7,color:"#444"}}>⟳ {lastUpd.toLocaleTimeString()}</div>}
+              </div>
+            </div>
+            {market.fng&&(
+              <div style={{marginTop:6,display:"flex",gap:12,alignItems:"center"}}>
+                <span style={{fontFamily:"monospace",fontSize:9,color:C.muted}}>F&G:</span>
+                <span style={{fontFamily:"monospace",fontSize:9,color:fngColor(market.fng.value),fontWeight:700}}>{market.fng.value} {fngLabel(market.fng.value)}</span>
+                {market.btcDom&&<><span style={{fontFamily:"monospace",fontSize:9,color:C.muted}}>BTC DOM:</span><span style={{fontFamily:"monospace",fontSize:9,color:C.gold}}>{market.btcDom.toFixed(1)}%</span></>}
+              </div>
+            )}
+          </div>
+
+          {errs.length>0&&(
+            <div style={{background:`${C.red}15`,borderBottom:`1px solid ${C.red}`,padding:"4px 14px",fontFamily:"monospace",fontSize:8,color:C.red,flexShrink:0}}>
+              ⚠ {errs.join(" · ")}
+            </div>
+          )}
+
+          <Ticker prices={prices} market={fullMarket}/>
+
+          {/* Scrollable content */}
+          <div style={{flex:1,overflowY:"auto",padding:12,WebkitOverflowScrolling:"touch"}}>
+            {tab==="command"  &&<CommandTab  prices={prices} market={fullMarket}/>}
+            {tab==="portfolio"&&<PortfolioTab prices={prices}/>}
+            {tab==="war"      &&<WarTab      prices={prices}/>}
+            {tab==="strategy" &&<StrategyTab market={fullMarket}/>}
+            {tab==="intel"    &&<IntelTab/>}
+            {tab==="legal"    &&<TermsTab/>}
+          </div>
+
+          {/* Bottom nav bar */}
+          <div style={{background:"#0A0C10",borderTop:`1px solid ${C.border}`,display:"flex",flexShrink:0,paddingBottom:"env(safe-area-inset-bottom)"}}>
+            {tabs.map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{
+                flex:1,padding:"10px 4px",background:tab===t.id?`${C.gold}15`:"transparent",
+                color:tab===t.id?C.gold:C.muted,border:"none",
+                borderTop:`2px solid ${tab===t.id?C.gold:"transparent"}`,
+                cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:2,
+              }}>
+                <span style={{fontSize:14}}>{t.icon}</span>
+                <span style={{fontFamily:"monospace",fontSize:7,letterSpacing:1,textTransform:"uppercase"}}>{t.id}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+
+    // ── Terms Tab ─────────────────────────────────────────────────────────────
+    function TermsTab() {
+      const Sh = {
+        h1: {fontFamily:"monospace",fontSize:12,color:"#C9A84C",fontWeight:700,letterSpacing:1,
+          borderBottom:"1px solid #8A6F2E",paddingBottom:5,marginBottom:8,marginTop:18},
+        h2: {fontFamily:"monospace",fontSize:10,color:"#E8E8E8",fontWeight:700,marginBottom:5,marginTop:10},
+        p:  {fontFamily:"monospace",fontSize:9,color:"#BBBBBB",lineHeight:1.6,marginBottom:7},
+        li: {fontFamily:"monospace",fontSize:9,color:"#BBBBBB",lineHeight:1.6,marginBottom:3,paddingLeft:14},
+        warn:{fontFamily:"monospace",fontSize:9,color:"#FF3B3B",lineHeight:1.6,
+          borderLeft:"3px solid #FF3B3B",padding:"7px 10px",background:"#1A0000",marginBottom:8},
+        note:{fontFamily:"monospace",fontSize:9,color:"#C9A84C",lineHeight:1.6,
+          borderLeft:"3px solid #C9A84C",padding:"7px 10px",background:"#1A1400",marginBottom:8},
+      };
+      const H1=({c})=><div style={Sh.h1}>{c}</div>;
+      const H2=({c})=><div style={Sh.h2}>{c}</div>;
+      const P =({c})=><div style={Sh.p}>{c}</div>;
+      const Li=({c})=><div style={Sh.li}>◆ {c}</div>;
+      const Wn=({c})=><div style={Sh.warn}>{c}</div>;
+      const Nt=({c})=><div style={Sh.note}>{c}</div>;
+      return (
+        <div>
+          <div style={{textAlign:"center",padding:"16px 0",borderBottom:"1px solid #1C2333"}}>
+            <div style={{fontFamily:"monospace",fontSize:24,fontWeight:900,color:"#C9A84C",letterSpacing:6}}>AOW</div>
+            <div style={{fontFamily:"monospace",fontSize:9,color:"#6B7280",marginTop:3}}>ART OF WAR CRYPTO INTELLIGENCE</div>
+            <div style={{fontFamily:"monospace",fontSize:11,color:"#E8E8E8",fontWeight:700,marginTop:6}}>TERMS AND CONDITIONS OF USE</div>
+            <div style={{fontFamily:"monospace",fontSize:8,color:"#6B7280",marginTop:3,fontStyle:"italic"}}>Effective Date: May 21, 2026</div>
+          </div>
+          <div style={{padding:"4px 2px"}}>
+            <Nt c="PLEASE READ CAREFULLY: By using AOW you agree to be bound by these Terms. If you do not agree, do not use AOW."/>
+            <H1 c="1. Acceptance of Terms"/>
+            <P c="These Terms and Conditions constitute a legally binding agreement between you and AOW / Art of War Crypto Intelligence governing your access to and use of the AOW platform, web application, mobile application, and all associated services."/>
+            <P c="By accessing or using the Service in any manner, you acknowledge you have read, understood, and agree to be bound by these Terms."/>
+            <H1 c="2. Description of Service"/>
+            <P c="AOW is a cryptocurrency market intelligence and portfolio strategy platform providing:"/>
+            <Li c="Real-time cryptocurrency price data from CoinGecko and Alternative.me"/>
+            <Li c="Market sentiment indicators including the Fear & Greed Index"/>
+            <Li c="Bitcoin dominance and global market capitalization data"/>
+            <Li c="Portfolio tracking and analysis tools based on user-provided holdings"/>
+            <Li c="Strategic frameworks and educational content related to cryptocurrency investment phases"/>
+            <Li c="Intelligence feeds and market commentary"/>
+            <P c="AOW is an informational and educational tool only. It is not a licensed financial advisor, broker-dealer, or financial institution of any kind."/>
+            <H1 c="3. Not Financial Advice — Critical Disclaimer"/>
+            <Wn c="ALL CONTENT, DATA, ANALYSIS, SIGNALS, PHASE INDICATORS, ROTATION ALERTS, AND STRATEGIC FRAMEWORKS PROVIDED BY AOW ARE FOR INFORMATIONAL AND EDUCATIONAL PURPOSES ONLY AND DO NOT CONSTITUTE FINANCIAL, INVESTMENT, LEGAL, OR TAX ADVICE."/>
+            <Li c="Nothing on AOW constitutes a recommendation to buy, sell, hold, or trade any cryptocurrency or financial instrument"/>
+            <Li c="The Phase I/II/III strategic framework is an educational model, not a guarantee of any financial outcome"/>
+            <Li c="Rotation signals, BTC ETF inflow meters, and altcoin season scores are informational tools, not trading instructions"/>
+            <Li c="Past performance does not guarantee future results"/>
+            <Li c="Cryptocurrency markets are highly volatile. You may lose some or all of your invested capital"/>
+            <Li c="You should consult a licensed financial advisor before making any investment decisions"/>
+            <H1 c="4. User Eligibility"/>
+            <Li c="You are at least 18 years of age or the age of majority in your jurisdiction"/>
+            <Li c="You have the legal capacity to enter into these Terms"/>
+            <Li c="Your use does not violate any applicable law in your jurisdiction"/>
+            <Li c="You are not on any government sanctions or prohibited party list"/>
+            <H1 c="5. User Accounts and Registration"/>
+            <P c="If you create an account, you agree to provide accurate information, maintain account security, and accept responsibility for all activities under your account. AOW reserves the right to suspend or terminate accounts that violate these Terms."/>
+            <H1 c="6. Subscription, Fees, and Payments"/>
+            <H2 c="6.1 Subscription Tiers"/>
+            <P c="AOW may offer multiple subscription tiers including free and paid plans. Features at each tier are subject to change with reasonable notice."/>
+            <H2 c="6.2 Billing"/>
+            <P c="Paid subscriptions are billed in advance on a recurring basis. By providing payment information, you authorize AOW to charge your payment method on a recurring basis."/>
+            <H2 c="6.3 Refunds"/>
+            <P c="Subscription fees are generally non-refundable. AOW may provide refunds at its sole discretion on a case-by-case basis."/>
+            <H2 c="6.4 Price Changes"/>
+            <P c="AOW reserves the right to modify subscription pricing with at least 30 days written notice. Continued use constitutes acceptance of new pricing."/>
+            <H2 c="6.5 Taxes"/>
+            <P c="You are responsible for all applicable taxes arising from your use of the Service."/>
+            <H1 c="7. Data, Privacy, and Portfolio Information"/>
+            <H2 c="7.1 Portfolio Data"/>
+            <P c="Portfolio holdings data you enter into AOW is used solely to provide Service features. AOW does not sell your personal portfolio data to third parties for advertising purposes."/>
+            <H2 c="7.2 Third-Party Data Sources"/>
+            <P c="AOW sources market data from CoinGecko and Alternative.me. AOW makes no representations regarding the accuracy, completeness, or timeliness of third-party data."/>
+            <H2 c="7.3 No Custody"/>
+            <P c="AOW is a read-only intelligence platform. AOW does not custody, hold, control, or have access to any of your cryptocurrency assets, private keys, wallet addresses, or exchange accounts."/>
+            <H1 c="8. Intellectual Property"/>
+            <P c="The AOW platform, including its design, code, content, strategic frameworks, and branding, is owned by AOW. AOW grants you a limited, non-exclusive, non-transferable, revocable license to access and use the Service for personal, non-commercial use. You may not copy, modify, distribute, sell, scrape, reverse engineer, or resell the Service without AOW's prior written consent."/>
+            <H1 c="9. Prohibited Conduct"/>
+            <Li c="Violate any applicable law, regulation, or third-party rights"/>
+            <Li c="Engage in market manipulation, fraud, or deceptive practices"/>
+            <Li c="Distribute malware or harmful code"/>
+            <Li c="Attempt unauthorized access to the Service or its systems"/>
+            <Li c="Impersonate any person or entity"/>
+            <Li c="Use the Service for commercial purposes without AOW's prior written consent"/>
+            <H1 c="10. Disclaimers of Warranties"/>
+            <Wn c='THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, OR UNINTERRUPTED ACCESS.'/>
+            <H1 c="11. Limitation of Liability"/>
+            <Wn c="TO THE FULLEST EXTENT PERMITTED BY LAW, AOW SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING ANY FINANCIAL LOSSES RESULTING FROM INVESTMENT DECISIONS MADE USING THE SERVICE. AOW's total aggregate liability shall not exceed the greater of (a) fees paid to AOW in the preceding twelve months, or (b) $100 USD."/>
+            <H1 c="12. Indemnification"/>
+            <P c="You agree to defend, indemnify, and hold harmless AOW and its officers, directors, employees, and agents from any claims, liabilities, damages, and expenses arising out of your use of the Service, violation of these Terms, or any investment decisions you make based on the Service."/>
+            <H1 c="13. Third-Party Services"/>
+            <P c="The Service integrates data from CoinGecko and Alternative.me. AOW is not responsible for the accuracy or availability of third-party data and does not endorse any third-party products or investment opportunities."/>
+            <H1 c="14. Modifications"/>
+            <P c="AOW reserves the right to modify, suspend, or discontinue the Service at any time. AOW may update these Terms at any time. Continued use constitutes acceptance of updated Terms."/>
+            <H1 c="15. Termination"/>
+            <P c="AOW may terminate or suspend your access immediately for any reason including breach of these Terms. Sections 3, 8, 10, 11, 12, and 16 survive termination."/>
+            <H1 c="16. Governing Law and Dispute Resolution"/>
+            <H2 c="16.1 Governing Law"/>
+            <P c="These Terms shall be governed by the laws of the United States and the state of Ohio, without regard to conflict of law provisions."/>
+            <H2 c="16.2 Arbitration"/>
+            <P c="Any dispute arising out of these Terms shall be settled by binding arbitration administered by the AAA under its Consumer Arbitration Rules. Arbitration shall take place in Ohio."/>
+            <H2 c="16.3 Class Action Waiver"/>
+            <P c="YOU WAIVE ANY RIGHT TO PARTICIPATE IN A CLASS ACTION LAWSUIT OR CLASS-WIDE ARBITRATION AGAINST AOW."/>
+            <H1 c="17. General Provisions"/>
+            <P c="These Terms constitute the entire agreement between you and AOW. If any provision is unenforceable, the remaining Terms remain in full force. You may not assign these Terms without AOW's prior written consent."/>
+            <H1 c="18. Contact Information"/>
+            <div style={{background:"#0D1117",border:"1px solid #1C2333",padding:12,borderRadius:4,marginBottom:10}}>
+              <div style={{fontFamily:"monospace",fontSize:10,color:"#C9A84C",fontWeight:700,marginBottom:6}}>AOW — Art of War Crypto Intelligence (4J4 LLC)</div>
+              <div style={{fontFamily:"monospace",fontSize:9,color:"#6B7280",marginBottom:3}}>Email: johnsda02@gmail.com</div>
+              <div style={{fontFamily:"monospace",fontSize:9,color:"#6B7280",marginBottom:3}}>LLC: 4J4 LLC · Ohio Entity #5448877</div>
+              <div style={{fontFamily:"monospace",fontSize:9,color:"#6B7280",marginBottom:3}}>Website: www.aow8.com</div>
+              <div style={{fontFamily:"monospace",fontSize:9,color:"#6B7280"}}>7880 Bobolink Dr, Cincinnati, OH 45224</div>
+            </div>
+            <Nt c="This document was prepared for informational purposes. Please consult a qualified attorney before publishing or relying on these Terms for legal protection."/>
+            <div style={{textAlign:"center",padding:"12px 0 4px",borderTop:"1px solid #1C2333",marginTop:6}}>
+              <div style={{fontFamily:"monospace",fontSize:8,color:"#6B7280"}}>Last Updated: May 21, 2026</div>
+              <div style={{fontFamily:"monospace",fontSize:7,color:"#333",marginTop:3}}>© 2026 AOW · Art of War Crypto Intelligence · 4J4 LLC · All Rights Reserved</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Boot
+    clearInterval(iv);
+    if(bar){ bar.style.width="100%"; setTimeout(()=>{ document.getElementById('root').innerHTML="<div id='app'></div>"; ReactDOM.createRoot(document.getElementById('app')).render(<App/>); },300); }
+    else { ReactDOM.createRoot(document.getElementById('root')).render(<App/>); }
+  </script>
+
+  <script>
+    // Register service worker for offline support
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
