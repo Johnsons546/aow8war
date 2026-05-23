@@ -139,7 +139,7 @@
       LINK:"chainlink",
       ADA:"cardano",
       HBAR:"hedera-hashgraph",
-      IP:"story-protocol",
+      IP:"story",
       RNDR:"render-token",
       ATOM:"cosmos",
       XLM:"stellar",
@@ -147,8 +147,10 @@
       OCEAN:"ocean-protocol",
       POL:"polygon-ecosystem-token",
       DOT:"polkadot",
-      DESO:"decentralized-social",
+      DESO:"deso",
       ICP:"internet-computer",
+      ALGO:"algorand",
+      XDC:"xdce-crowd-sale",
     };
 
     const PORTFOLIO_BASE = [
@@ -168,22 +170,35 @@
       { symbol:"DOT",  name:"Polkadot",          amount:39.07,   role:"infrastructure",phase:2, staked:true },
       { symbol:"DESO", name:"DeSo",              amount:12.72,   role:"speculative",   phase:3 },
       { symbol:"ICP",  name:"Internet Computer", amount:7.69,    role:"speculative",   phase:3 },
+      { symbol:"ALGO", name:"Algorand",           amount:0,       role:"remittance",    phase:1 },
+      { symbol:"XDC",  name:"XDC Network",        amount:0,       role:"remittance",    phase:1 },
     ];
 
     const REMITTANCE_WAR = [
-      { company:"Ripple",        token:"XRP", stablecoin:"RLUSD", chain:"XRP Ledger", partner:"BNY Mellon",        strength:88 },
-      { company:"Western Union", token:"SOL", stablecoin:"USDPT", chain:"Solana",     partner:"Anchorage Digital",  strength:74 },
-      { company:"MoneyGram",     token:"XLM", stablecoin:"USDC",  chain:"Ethereum/Stellar", partner:"Circle", status:"legacy", strength:61, note:"Partnership with Stellar ended 2023 — historical reference" },
+      { company:"Ripple",         token:"XRP",  stablecoin:"RLUSD", chain:"XRP Ledger",  partner:"BNY Mellon",                  strength:88 },
+      { company:"Western Union",  token:"SOL",  stablecoin:"USDPT", chain:"Solana",      partner:"Anchorage Digital",            strength:74 },
+      { company:"Wirex/Noah",     token:"ALGO", stablecoin:"USDC",  chain:"Algorand",    partner:"Wirex + Algorand Foundation",  strength:67 },
+      { company:"Hedera Banks",   token:"HBAR", stablecoin:"HBAR",  chain:"Hedera",      partner:"Shinhan + Standard Bank",      strength:63 },
+      { company:"XDC/TradeFinex", token:"XDC",  stablecoin:"XUSD",  chain:"XDC Network", partner:"SBI Holdings + Deutsche Telekom", strength:58 },
+      { company:"MoneyGram",      token:"XLM",  stablecoin:"USDC",  chain:"Stellar",     partner:"Circle",                      strength:52, note:"Partnership with Stellar ended 2023 — historical reference" },
     ];
 
     const INTEL_FEED = [
       { date:"May 21, 2026", event:"CNBC Disruptor 50 — AI dominates; crypto infrastructure companies rising in ranks", impact:"bullish", phase:1 },
-      { date:"May 4, 2026",  event:"Western Union USDPT goes live on Solana",              impact:"bullish", phase:1 },
-      { date:"Apr 27, 2026", event:"WU CEO: 'No longer if — it's how fast we scale'",      impact:"bullish", phase:1 },
-      { date:"Dec 2025",     event:"OCC approves Ripple National Trust Bank",              impact:"bullish", phase:1 },
-      { date:"Nov 2025",     event:"Ripple raises $500M at $40B valuation from Citadel",  impact:"bullish", phase:1 },
-      { date:"Oct 2025",     event:"Western Union announces USDPT + Solana partnership",  impact:"bullish", phase:1 },
-      { date:"Jul 2025",     event:"Dubai Land Dept tokenizes real estate on XRP Ledger", impact:"bullish", phase:1 },
+      { date:"May 4, 2026",  event:"Western Union USDPT goes live on Solana",                                          impact:"bullish", phase:1 },
+      { date:"Feb 2026",     event:"Ripple secures 75+ global payment licenses across 6 continents",                   impact:"bullish", phase:1 },
+      { date:"Jan 2026",     event:"NYT covers HesabPay: Algorand powering remittances for 1M+ Afghans",              impact:"bullish", phase:1 },
+      { date:"Jan 2026",     event:"Brale regulated stablecoin platform expands to Algorand network",                  impact:"bullish", phase:1 },
+      { date:"Dec 2025",     event:"Wirex + Algorand: zero-fee USDC payments to 7M users across 80M Visa merchants",  impact:"bullish", phase:1 },
+      { date:"Dec 2025",     event:"tZERO expands tokenization infrastructure to Stellar, XDC, and Algorand",         impact:"bullish", phase:1 },
+      { date:"Dec 2025",     event:"OCC approves Ripple National Trust Bank — first crypto national bank",             impact:"bullish", phase:1 },
+      { date:"Dec 2025",     event:"Hedera: $5B tokenized real estate + live bank remittance pilots (Shinhan, Standard Bank, SCB TechX)", impact:"bullish", phase:1 },
+      { date:"Nov 2025",     event:"Algorand + Noah: compliant cross-border payment infrastructure US, Europe & India",impact:"bullish", phase:1 },
+      { date:"Nov 2025",     event:"ISO 20022 becomes mandatory globally — XRP, ALGO, HBAR, XDC, XLM, ADA all aligned",impact:"bullish", phase:1 },
+      { date:"Nov 2025",     event:"Ripple raises $500M at $40B valuation from Citadel",                              impact:"bullish", phase:1 },
+      { date:"Oct 2025",     event:"Western Union announces USDPT + Solana strategic partnership",                    impact:"bullish", phase:1 },
+      { date:"Aug 2025",     event:"XDC 2.0: 3-second block finality + MiCA-compliant architecture goes live",        impact:"bullish", phase:1 },
+      { date:"Jul 2025",     event:"Dubai Land Department tokenizes real estate on XRP Ledger",                       impact:"bullish", phase:1 },
     ];
 
     const BTC_INFLOW_THRESHOLD = 5950; // Based on Nov 2024 record weekly inflow of $5.95B (CoinShares) — breach signals peak retail FOMO
@@ -262,6 +277,8 @@
         {label:"BTC PRICE", value:btcP?`$${fmt(btcP)}`:"…", sub:prices.BTC?<Change val={prices.BTC.change24h}/>:"Phase III target", color:C.gold, bar:null},
         {label:"ALT SEASON SCORE", value:`${altSeason}%`, sub:altSeason>=75?"🔥 Alt season — portfolio outperforming":altSeason>=50?"Partial — some alts beating BTC":"BTC dominant — alts lagging", color:altSeason>=75?C.green:altSeason>=50?C.gold:C.muted, bar:{v:altSeason,m:100,c:altSeason>=75?C.green:C.gold}, tip:`Custom: % of your holdings beating BTC 24h · ${beating}/${altcoins.length} coins`},
         {label:"ETF SIGNAL", value:`${Math.round((BTC_INFLOW_CURRENT/BTC_INFLOW_THRESHOLD)*100)}%`, sub:"$3.24B/$5.95B weekly · src: CoinShares", color:C.gold, bar:{v:BTC_INFLOW_CURRENT,m:BTC_INFLOW_THRESHOLD,c:C.gold}},
+      {label:"ISO 20022 COMPLIANCE", value:"ACTIVE", sub:"XRP, ALGO, HBAR, XDC, XLM, ADA — all compliant · Nov 2025", color:C.green, bar:null},
+      {label:"REMITTANCE CORRIDORS", value:"6 CHAINS", sub:"XRP·SOL·ALGO·HBAR·XDC·XLM active", color:C.gold, bar:{v:6,m:10,c:C.gold}},
       ];
 
       return (
@@ -283,8 +300,8 @@
 
     // ── Command Tab ───────────────────────────────────────────────────────────
     function CommandTab({ prices, market }) {
-      const withP=PORTFOLIO_BASE.map(a=>({...a,value:prices[a.symbol]?prices[a.symbol].price*a.amount:0}));
-      const remTotal=withP.filter(a=>a.role==="remittance").reduce((s,a)=>s+a.value,0);
+      const withP=PORTFOLIO_BASE.map(a=>({...a,value:(()=>{const _v=prices[a.symbol]?prices[a.symbol].price*a.amount:0; return !isNaN(_v)&&isFinite(_v)?_v:0;})():0}));
+      const remTotal=withP.filter(a=>a.role==="remittance").reduce((s,a)=>s+(!isNaN(a.value)&&isFinite(a.value)?a.value:0),0);
       const stakedTotal=withP.filter(a=>a.staked&&!isNaN(a.value)&&isFinite(a.value)).reduce((s,a)=>s+a.value,0);
       const pct=Math.round((BTC_INFLOW_CURRENT/BTC_INFLOW_THRESHOLD)*100);
 
@@ -361,8 +378,8 @@
     function PortfolioTab({ prices }) {
       const [filter,setFilter]=useState("all");
       const roleColor=r=>r==="remittance"?C.gold:r==="oracle"?C.blue:r==="ai"?C.purple:C.muted;
-      const withP=PORTFOLIO_BASE.map(a=>{const p=prices[a.symbol];return{...a,price:p?.price||0,change24h:p?.change24h||null,value:p?p.price*a.amount:0};}).sort((a,b)=>b.value-a.value);
-      const total=withP.reduce((s,a)=>s+a.value,0);
+      const withP=PORTFOLIO_BASE.map(a=>{const p=prices[a.symbol];return{...a,price:p?.price||0,change24h:p?.change24h||null,value:(()=>{const v=p?p.price*a.amount:0; return (!isNaN(v)&&isFinite(v)?v:0);})()};}).sort((a,b)=>b.value-a.value);
+      const total=withP.reduce((s,a)=>s+(!isNaN(a.value)&&isFinite(a.value)?a.value:0),0);
       const filters=["all","remittance","staked","speculative"];
       const filtered=filter==="all"?withP:filter==="remittance"?withP.filter(a=>a.role==="remittance"):filter==="staked"?withP.filter(a=>a.staked):withP.filter(a=>a.role==="speculative");
 
@@ -371,7 +388,7 @@
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
             {[
               {l:"TOTAL VALUE",v:`$${fmt(total)}`,c:C.gold},
-              {l:"REMITTANCE %",v:`${total>0?Math.round((withP.filter(a=>a.role==="remittance").reduce((s,a)=>s+a.value,0)/total)*100):0}%`,c:C.gold},
+              {l:"REMITTANCE %",v:`${total>0?Math.round((withP.filter(a=>a.role==="remittance").reduce((s,a)=>s+(!isNaN(a.value)?a.value:0),0)/total)*100):0}%`,c:C.gold},
             ].map((s,i)=>(
               <div key={i} style={{padding:10,background:C.surface,border:`1px solid ${C.border}`,borderRadius:4}}>
                 <div style={{fontFamily:"monospace",fontSize:8,color:C.muted,marginBottom:4}}>{s.l}</div>
@@ -423,14 +440,14 @@
         <div style={{background:C.surface,border:`1px solid ${C.border}`,padding:16,borderRadius:4}}>
           <div style={{fontFamily:"monospace",fontSize:9,color:C.muted,letterSpacing:2,marginBottom:8}}>REMITTANCE WAR SCOREBOARD</div>
           <div style={{fontFamily:"monospace",fontSize:8,color:"#444",marginBottom:14,padding:"6px 8px",background:"#0A0C10",borderLeft:`2px solid ${C.goldDim}`}}>
-            WAR SCORE methodology: Weighted composite of institutional custody strength (30pts), live stablecoin deployment status (25pts), geographic corridor coverage (25pts), and regulatory clarity (20pts). Max 100.
+            WAR SCORE methodology: Institutional custody (30pts) + Live stablecoin deployment (25pts) + Geographic corridor coverage (25pts) + Regulatory/ISO 20022 compliance (20pts). Max 100. Tracking 6 active remittance blockchains.
           </div>
           {REMITTANCE_WAR.map((r,i)=>{
             const p=prices[r.token];
-            const cols=[C.gold,C.blue,C.muted];
+            const cols=[C.gold,C.blue,C.green,"#A855F7","#FF8C42",C.muted];
             const isLegacy=r.status==="legacy";
             return (
-              <div key={i} style={{marginBottom:i<2?16:0,paddingBottom:i<2?16:0,borderBottom:i<2?`1px solid ${C.border}`:"none"}}>
+              <div key={i} style={{marginBottom:i<2?16:0,paddingBottom:i<2?16:0,borderBottom:i<5?`1px solid ${C.border}`:"none"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                   <div style={{flex:1,marginRight:12}}>
                     <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4,flexWrap:"wrap"}}>
@@ -546,16 +563,20 @@
 
       const fetchPrices=useCallback(async()=>{
         try {
-          const ids=[...Object.values(COINGECKO_IDS),"bitcoin"].join(",");
+          const ids=[...Object.values(COINGECKO_IDS),...Object.values({POL:"matic-network",IP:"story-2",DESO:"decentralized-social",XDC:"xdc-network"}),"bitcoin"].filter((v,i,a)=>a.indexOf(v)===i).join(",");
           const res=await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`);
           if(!res.ok) throw new Error(`HTTP ${res.status}`);
           const data=await res.json();
           const m={};
           // Sanity check: reject any price that is null, NaN, negative, or unreasonably large
           const isValidPrice = (p) => p!=null && !isNaN(p) && isFinite(p) && p>0 && p<10000000;
+          // Fallback IDs for tokens with known ID issues
+          const FALLBACK_IDS = { POL:"matic-network", IP:"story-2", DESO:"decentralized-social", XDC:"xdc-network" };
           for(const [s,id] of Object.entries(COINGECKO_IDS)) {
             if(data[id] && isValidPrice(data[id].usd)) {
               m[s]={price:data[id].usd, change24h:data[id].usd_24h_change??0};
+            } else if(FALLBACK_IDS[s] && data[FALLBACK_IDS[s]] && isValidPrice(data[FALLBACK_IDS[s]].usd)) {
+              m[s]={price:data[FALLBACK_IDS[s]].usd, change24h:data[FALLBACK_IDS[s]].usd_24h_change??0};
             }
           }
           if(data.bitcoin && isValidPrice(data.bitcoin.usd)) m.BTC={price:data.bitcoin.usd,change24h:data.bitcoin.usd_24h_change??0};
@@ -589,7 +610,7 @@
       useEffect(()=>{ fetchAll(); const id=setInterval(fetchAll,60000); return()=>clearInterval(id); },[fetchAll]);
 
       const fullMarket={...market,btcPrice:prices.BTC?.price};
-      const total=PORTFOLIO_BASE.reduce((s,a)=>{const v=prices[a.symbol]?prices[a.symbol].price*a.amount:0; return s+(isNaN(v)?0:v);},0);
+      const total=PORTFOLIO_BASE.reduce((s,a)=>{const v=prices[a.symbol]?prices[a.symbol].price*a.amount:0; return s+(!isNaN(v)&&isFinite(v)?v:0);},0); return s+(isNaN(v)?0:v);},0);
       const tabs=[{id:"command",icon:"⚔"},{id:"portfolio",icon:"◈"},{id:"war",icon:"⚡"},{id:"strategy",icon:"◎"},{id:"intel",icon:"◉"},{id:"legal",icon:"⚖"}];
 
       return (
